@@ -118,8 +118,6 @@ class Control:
 
 def gpioInit():
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(constant.ENCODER_LEFT, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(constant.ENCODER_RIGHT, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(constant.ENA, GPIO.OUT)
     GPIO.setup(constant.IN1, GPIO.OUT)
     GPIO.setup(constant.IN2, GPIO.OUT)
