@@ -1,6 +1,7 @@
 #----------------------------------------------------------------------
 # CAU CHIRO : KGH
 # Raspberry pi 3B, bullseye 64bit
+# python3 == python 3.9
 # if you were to participate in CAU MJY X CHIRO projectLab
 # the use of this code is prohibited
 #----------------------------------------------------------------------
@@ -294,26 +295,26 @@ def trafficLight(img, pts):
                 cv2.putText(img, "left", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
             elif r1 > r2:
                 cv2.putText(img, "right", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
-            if ssim_index_l > 0.4:
-                roi=cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
-                roi_left = roi[0:h, 0:int(w/2)]
-                roi_right = roi[0:h, int(w/2):w]
-                h1,w1, _ = roi_left.shape
-                h2,w2, _ = roi_right.shape
-                g1=g2=r1=r2=0
+        if ssim_index_l > 0.4:
+            roi=cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
+            roi_left = roi[0:h, 0:int(w/2)]
+            roi_right = roi[0:h, int(w/2):w]
+            h1,w1, _ = roi_left.shape
+            h2,w2, _ = roi_right.shape
+            g1=g2=r1=r2=0
 
-            for p in range(h1):
-                for q in range(w1):
-                    g1=roi_left[p,q,1]+g1
-                    r1=roi_left[p,q,0]+r1
-            for p in range(h2):
-                for q in range(w2):
-                    g2=roi_right[p,q,1]+g2
-                    r2=roi_right[p,q,0]+r2
-            if r1 < r2:
-                cv2.putText(img, "left", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
-            elif r1 > r2:
-                cv2.putText(img, "right", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
+        for p in range(h1):
+            for q in range(w1):
+                g1=roi_left[p,q,1]+g1
+                r1=roi_left[p,q,0]+r1
+        for p in range(h2):
+            for q in range(w2):
+                g2=roi_right[p,q,1]+g2
+                r2=roi_right[p,q,0]+r2
+        if r1 < r2:
+            cv2.putText(img, "left", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
+        elif r1 > r2:
+            cv2.putText(img, "right", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
 
 #-----------------------------------------------------------------------
 #------------------ shape detect function ----- ------------------------
