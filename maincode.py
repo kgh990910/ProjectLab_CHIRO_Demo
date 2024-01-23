@@ -159,10 +159,10 @@ def setMotor(CH, pwm, SPEED, DIRECTION):
         if DIRECTION == constant.STOP:
             GPIO.output(constant.IN1, constant.LOW)
             GPIO.output(constant.IN2, constant.LOW)
-        elif DIRECTION == constant.BACKWARD:
+        elif DIRECTION == constant.FORWARD:
             GPIO.output(constant.IN1, constant.HIGH)
             GPIO.output(constant.IN2, constant.LOW)
-        elif DIRECTION == constant.FORWARD:
+        elif DIRECTION == constant.BACKWARD:
             GPIO.output(constant.IN1, constant.LOW)
             GPIO.output(constant.IN2, constant.HIGH)
     elif CH==constant.R:
@@ -170,10 +170,10 @@ def setMotor(CH, pwm, SPEED, DIRECTION):
         if DIRECTION == constant.STOP:
             GPIO.output(constant.IN3, constant.LOW)
             GPIO.output(constant.IN4, constant.LOW)
-        elif DIRECTION == constant.FORWARD:
+        elif DIRECTION == constant.BACKWARD:
             GPIO.output(constant.IN3, constant.HIGH)
             GPIO.output(constant.IN4, constant.LOW)
-        elif DIRECTION == constant.BACKWARD:
+        elif DIRECTION == constant.FORWARD:
             GPIO.output(constant.IN3, constant.LOW)
             GPIO.output(constant.IN4, constant.HIGH)
    
@@ -234,7 +234,7 @@ def detectHuman(frame):
 
     for (x, y, w, h) in humans:
         cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-    cv2.imshow('Human Detection', frame)
+    # cv2.imshow('Human Detection', frame)
 
 #-----------------------------------------------------------------------
 #------------------ detect traffic light "stop" ------------------------
@@ -301,18 +301,18 @@ def trafficLight(img, pts):
             h2,w2, _ = roi_right.shape
             g1=g2=r1=r2=0
 
-        for p in range(h1):
-            for q in range(w1):
-                g1=roi_left[p,q,1]+g1
-                r1=roi_left[p,q,0]+r1
-        for p in range(h2):
-            for q in range(w2):
-                g2=roi_right[p,q,1]+g2
-                r2=roi_right[p,q,0]+r2
-        if r1 < r2:
-            cv2.putText(img, "left", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
-        elif r1 > r2:
-            cv2.putText(img, "right", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
+            for p in range(h1):
+                for q in range(w1):
+                    g1=roi_left[p,q,1]+g1
+                    r1=roi_left[p,q,0]+r1
+            for p in range(h2):
+                for q in range(w2):
+                    g2=roi_right[p,q,1]+g2
+                    r2=roi_right[p,q,0]+r2
+            if r1 < r2:
+                cv2.putText(img, "left", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
+            elif r1 > r2:
+                cv2.putText(img, "right", (pt1[0], pt1[1]-3), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
 
 #-----------------------------------------------------------------------
 #------------------ shape detect function ----- ------------------------
@@ -322,7 +322,7 @@ def detect(frame_blur, frame_color):
     detectHuman(frame_blur)
     canny=cv2.Canny(frame_blur,50,100)
     contours, _ = cv2.findContours(canny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    cv2.imshow("canny", canny)
+    # cv2.imshow("canny", canny)
 
     for cnt in contours:
         approx =cv2.approxPolyDP(cnt, cv2.arcLength(cnt, True)*0.04, True)
@@ -343,7 +343,7 @@ def detect(frame_blur, frame_color):
 
                 if int(ratio) == 1:
                     checkStop(frame_color, cnt)
-    cv2.imshow('test', frame_color)
+    # cv2.imshow('test', frame_color)
         
 #-----------------------------------------------------------------------
 #-------------------------- Main Function ------------------------------
@@ -358,13 +358,13 @@ try:
 
     # ledOnOff(constant.HIGH)
 
-    # setMotor(constant.L, pwmL, LEFT_SPEED, constant.BACKWARD)
-    # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
-    # time.sleep(5)
+    setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
+    setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
+    time.sleep(5)
     while True:
 
-        LEFT_SPEED = 100
-        RIGHT_SPEED = 100
+        # LEFT_SPEED = 100
+        # RIGHT_SPEED = 100
 
         ret, frame = capture.read()
 
@@ -414,31 +414,32 @@ try:
         right_CAHANGE = right_PID.pid(constant.RIGHT_WEIGHT_TARGET, RIGHT_WEIGHT)
         # left_CAHANGE = abs(left_PID.pid(constant.LEFT_WEIGHT_TARGET, LEFT_WEIGHT))
         # right_CAHANGE = abs(right_PID.pid(constant.RIGHT_WEIGHT_TARGET, RIGHT_WEIGHT))
-
-        # LEFT_SPEED += int(-left_CAHANGE)
-        # RIGHT_SPEED += int(right_CAHANGE)
-        # print("LEFTSPEED : " + str(LEFT_SPEED) + "RIGHTSPEED : " + str(RIGHT_SPEED))
-        # if LEFT_SPEED > RIGHT_SPEED and abs(LEFT_SPEED-RIGHT_SPEED)>5:
-        #     # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
-        #     # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
-        #     # time.sleep(0.01)
-        #     setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
-        #     setMotor(constant.R, pwmR, RIGHT_SPEED, constant.BACKWARD)
-        #     print("RIGHT")    
-        # elif LEFT_SPEED < RIGHT_SPEED and abs(LEFT_SPEED-RIGHT_SPEED)>5:
-        #     # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
-        #     # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
-        #     # time.sleep(0.01)
-        #     setMotor(constant.L, pwmL, LEFT_SPEED, constant.BACKWARD)
-        #     setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)    
-        #     print("LEFT")
-        # else :
-        #     # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
-        #     # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
-        #     # time.sleep(0.01)
-        #     setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
-        #     setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)    
-        #     print("STRA")
+        if LEFT_SPEED + int(-left_CAHANGE) < 100 and LEFT_SPEED + int(-left_CAHANGE) > 0:
+            LEFT_SPEED += int(-left_CAHANGE)
+        if RIGHT_SPEED + int(right_CAHANGE) < 100 and RIGHT_SPEED + int(right_CAHANGE) > 0:
+            RIGHT_SPEED += int(right_CAHANGE)
+        print("LEFTSPEED : " + str(LEFT_SPEED) + "RIGHTSPEED : " + str(RIGHT_SPEED))
+        if LEFT_SPEED > RIGHT_SPEED and abs(LEFT_SPEED-RIGHT_SPEED)>5:
+            # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
+            # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
+            # time.sleep(0.01)
+            setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
+            setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
+            print("RIGHT")    
+        elif LEFT_SPEED < RIGHT_SPEED and abs(LEFT_SPEED-RIGHT_SPEED)>5:
+            # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
+            # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
+            # time.sleep(0.01)
+            setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
+            setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)    
+            print("LEFT")
+        else :
+            # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
+            # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
+            # time.sleep(0.01)
+            setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
+            setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)    
+            print("START")
     
     # 모터 구동 코드
         # setMotor(constant.L, pwmL, LEFT_SPEED, constant.BACKWARD)
