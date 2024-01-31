@@ -38,11 +38,10 @@ human_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fullb
 #--------------------- set GPIO pin Num --------------------------------
 #-----------------------------------------------------------------------
 
-constant.ENCODER_LEFT = 23
-constant.ENCODER_RIGHT = 24
+
 constant.ENA = 13
-constant.IN1 = 6
-constant.IN2 = 5
+constant.IN1 = 5
+constant.IN2 = 6
 constant.IN3 = 22
 constant.IN4 = 27
 constant.ENB = 12
@@ -65,52 +64,27 @@ constant.FRAME_HOR=256
 constant.ROI_VER=int(constant.FRAME_VER/2)
 constant.ROI_HOR=int(constant.FRAME_HOR/3)
 
-constant.LEFT_WEIGHT_TARGET = 35
-constant.RIGHT_WEIGHT_TARGET = 35
-
+constant.LEFT_WEIGHT_TARGET = 17
+constant.RIGHT_WEIGHT_TARGET = 42
+constant.TRACK_WEIGHT_TARGET = 127
+constant.WEIGHT_OFFSET = 30
 constant.BLACK= (255, 255, 255)
+
+#-----------------------------------------------------------------------
+#--------------------- set glo variable --------------------------------
+#-----------------------------------------------------------------------
 
 #-----------------------------------------------------------------------
 #--------------------- set pid variable --------------------------------
 #-----------------------------------------------------------------------
 
-LEFT_SPEED = 80
-RIGHT_SPEED = 80
-kp,kd,ki = 0.6,0,0
+LEFT_SPEED = 10
+RIGHT_SPEED = 10
+# LEFT_SPEED = 0
+# RIGHT_SPEED = 0
+
+
 # pwmL, pwmR = 0, 0
-
-#-----------------------------------------------------------------------
-#--------------------- pid control class -------------------------------
-#-----------------------------------------------------------------------
-
-class Control:
-    def __init__(self):
-        self.error = 0
-        self.error_prev = 0
-        self.Pterm = 0
-        self.Iterm = 0
-        self.Dterm = 0
-        self.PIDterm = 0
-        self.time_prev = time.time() - 1
-
-    def pid(self, target, current):
-        global kp, ki, kd
-
-        # error, dt cal
-        self.error = target - current
-        dt = time.time() - self.time_prev
-
-        # control
-        self.Pterm = kp * self.error # P control
-        self.Iterm += ki * self.error * dt # I control
-        self.Dterm = kd * (self.error - self.error_prev) / dt # D control (- wtf)
-        self.PIDterm = self.Pterm + self.Iterm + self.Dterm # PID control
-        
-        # data update
-        self.error_prev = self.error
-        self.time_prev = time.time()
-
-        return self.PIDterm
 
 #-----------------------------------------------------------------------
 #--------------------- gpio init function ------------------------------
@@ -154,8 +128,7 @@ def camerInit():
 
 def setMotor(CH, pwm, SPEED, DIRECTION):
     pwm.ChangeDutyCycle(SPEED)
-    if CH==constant.L:
-        # pwmL.ChangeDutyCycle(SPEED)
+    if CH==constant.R:
         if DIRECTION == constant.STOP:
             GPIO.output(constant.IN1, constant.LOW)
             GPIO.output(constant.IN2, constant.LOW)
@@ -165,8 +138,7 @@ def setMotor(CH, pwm, SPEED, DIRECTION):
         elif DIRECTION == constant.BACKWARD:
             GPIO.output(constant.IN1, constant.LOW)
             GPIO.output(constant.IN2, constant.HIGH)
-    elif CH==constant.R:
-        # pwmR.ChangeDutyCycle(SPEED)
+    elif CH==constant.L:
         if DIRECTION == constant.STOP:
             GPIO.output(constant.IN3, constant.LOW)
             GPIO.output(constant.IN4, constant.LOW)
@@ -344,7 +316,21 @@ def detect(frame_blur, frame_color):
                 if int(ratio) == 1:
                     checkStop(frame_color, cnt)
     # cv2.imshow('test', frame_color)
-        
+
+
+def getWeight(roi_frame, WEIGHT):
+    contours, hierarchy = cv2.findContours(roi_frame, 1, cv2.CHAIN_APPROX_NONE)
+    if len(contours) > 0:
+        c = max(contours, key=cv2.contourArea)
+        M = cv2.moments(c)
+        if M['m00'] != 0:
+            cx = int(M['m10']/M['m00'])
+            WEIGHT = cx
+            cv2.line(roi_frame,(cx,0),(cx,constant.ROI_VER),(255,0,0),1) 
+
+    return WEIGHT
+
+
 #-----------------------------------------------------------------------
 #-------------------------- Main Function ------------------------------
 #-----------------------------------------------------------------------
@@ -352,19 +338,15 @@ def detect(frame_blur, frame_color):
 try:
     pwmL, pwmR = gpioInit()
     capture = camerInit()
-
-    left_PID=Control()
-    right_PID=Control()
-
+    
+    LEFT_WEIGHT = 0
+    RIGHT_WEIGHT = 0 
     # ledOnOff(constant.HIGH)
 
-    setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
-    setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
+    # setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
+    # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
     time.sleep(5)
     while True:
-
-        # LEFT_SPEED = 100
-        # RIGHT_SPEED = 100
 
         ret, frame = capture.read()
 
@@ -373,94 +355,53 @@ try:
         frame_gray = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
         frame_blur = cv2.GaussianBlur(frame_gray, (5,5), sigmaX=1.0)
 
-        detect(frame_blur, resized_frame)
+        # detect(frame_blur, resized_frame)
 
 #----------------------------------------------------------------------------------------------------
 #---------------------------- line weight detect-----------------------------------------------------
 #----------------------------------------------------------------------------------------------------
 
-        ret, frame_binary = cv2.threshold(frame_blur, 100, 255, cv2.THRESH_BINARY)
+        ret, frame_binary = cv2.threshold(frame_blur, 150, 255, cv2.THRESH_BINARY)
+
         left_roi = frame_binary[constant.FRAME_VER - constant.ROI_VER : constant.FRAME_VER, 0:constant.ROI_HOR]
         right_roi = frame_binary[constant.FRAME_VER - constant.ROI_VER : constant.FRAME_VER, constant.FRAME_HOR-constant.ROI_HOR:constant.FRAME_HOR]
+        track_roi = frame_binary[constant.FRAME_VER - constant.ROI_VER : constant.FRAME_VER, 0:constant.FRAME_HOR]
 
-        left_contours, hierarchy = cv2.findContours(left_roi, 1, cv2.CHAIN_APPROX_NONE)
-        right_contours, hierarchy = cv2.findContours(right_roi, 1, cv2.CHAIN_APPROX_NONE)
+        # left_contours, hierarchy = cv2.findContours(left_roi, 1, cv2.CHAIN_APPROX_NONE)
+        # right_contours, hierarchy = cv2.findContours(right_roi, 1, cv2.CHAIN_APPROX_NONE)
 
-        LEFT_WEIGHT = constant.LEFT_WEIGHT_TARGET
-        RIGHT_WEIGHT = constant.RIGHT_WEIGHT_TARGET
-        if len(left_contours) > 0:
-            c = max(left_contours, key=cv2.contourArea)
-            M = cv2.moments(c)
-            if M['m00'] != 0:
-                cx = int(M['m10']/M['m00'])
-                LEFT_WEIGHT = cx
-                cv2.line(left_roi,(cx,0),(cx,constant.ROI_VER),(255,0,0),1) 
+        LEFT_WEIGHT = getWeight(left_roi, LEFT_WEIGHT)
+        RIGHT_WEIGHT = getWeight(right_roi, RIGHT_WEIGHT)
 
-        if len(right_contours) > 0:
-            c = max(right_contours, key=cv2.contourArea)
-            M = cv2.moments(c)
-            if M['m00'] != 0:
-                cx = int(M['m10']/M['m00'])
-                RIGHT_WEIGHT = cx
-                cv2.line(right_roi,(cx,0),(cx,constant.ROI_VER),(255,0,0),1) 
-
+        # TRACK_WEIGHT = int((LEFT_WEIGHT+RIGHT_WEIGHT+(constant.FRAME_HOR/2))/2)
+        TRACK_WEIGHT = int((LEFT_WEIGHT+RIGHT_WEIGHT+(constant.FRAME_HOR*2/3))/2)
+        cv2.line(track_roi,(constant.TRACK_WEIGHT_TARGET+constant.WEIGHT_OFFSET, 0),(constant.TRACK_WEIGHT_TARGET+constant.WEIGHT_OFFSET, constant.ROI_VER),(255,0,0),1)
+        cv2.line(track_roi,(constant.TRACK_WEIGHT_TARGET-constant.WEIGHT_OFFSET, 0),(constant.TRACK_WEIGHT_TARGET-constant.WEIGHT_OFFSET, constant.ROI_VER),(255,0,0),1)
+        cv2.line(track_roi,(TRACK_WEIGHT, 0),(TRACK_WEIGHT, constant.ROI_VER),(255,0,0),1)
+        
 #----------------------------------------------------------------------------------------------------
 #----------------------------------- Set PID --------------------------------------------------------
 #----------------------------------------------------------------------------------------------------
-
-        # left_CAHANGE = left_PID.pid(constant.LEFT_WEIGHT_TARGET, abs(LEFT_WEIGHT))
-        # right_CAHANGE = right_PID.pid(constant.RIGHT_WEIGHT_TARGET, abs(RIGHT_WEIGHT))
-        left_CAHANGE = left_PID.pid(constant.LEFT_WEIGHT_TARGET, LEFT_WEIGHT)
-        right_CAHANGE = right_PID.pid(constant.RIGHT_WEIGHT_TARGET, RIGHT_WEIGHT)
-        # left_CAHANGE = abs(left_PID.pid(constant.LEFT_WEIGHT_TARGET, LEFT_WEIGHT))
-        # right_CAHANGE = abs(right_PID.pid(constant.RIGHT_WEIGHT_TARGET, RIGHT_WEIGHT))
-        if LEFT_SPEED + int(-left_CAHANGE) < 100 and LEFT_SPEED + int(-left_CAHANGE) > 0:
-            LEFT_SPEED += int(-left_CAHANGE)
-        if RIGHT_SPEED + int(right_CAHANGE) < 100 and RIGHT_SPEED + int(right_CAHANGE) > 0:
-            RIGHT_SPEED += int(right_CAHANGE)
-        print("LEFTSPEED : " + str(LEFT_SPEED) + "RIGHTSPEED : " + str(RIGHT_SPEED))
-        if LEFT_SPEED > RIGHT_SPEED and abs(LEFT_SPEED-RIGHT_SPEED)>5:
-            # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
-            # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
-            # time.sleep(0.01)
+        print(str(LEFT_WEIGHT) + "\t\t" + str(TRACK_WEIGHT) + "\t\t" + str(RIGHT_WEIGHT))
+        if TRACK_WEIGHT < (constant.TRACK_WEIGHT_TARGET - constant.WEIGHT_OFFSET):
+            print("LEFT")
+            setMotor(constant.L, pwmL, LEFT_SPEED, constant.BACKWARD)
+            setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
+        elif TRACK_WEIGHT > (constant.TRACK_WEIGHT_TARGET + constant.WEIGHT_OFFSET):
+            print("right")
+            setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
+            setMotor(constant.R, pwmR, RIGHT_SPEED, constant.BACKWARD)
+        else:
+            print("strai")
             setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
             setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
-            print("RIGHT")    
-        elif LEFT_SPEED < RIGHT_SPEED and abs(LEFT_SPEED-RIGHT_SPEED)>5:
-            # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
-            # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
-            # time.sleep(0.01)
-            setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
-            setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)    
-            print("LEFT")
-        else :
-            # setMotor(constant.L, pwmL, LEFT_SPEED, constant.STOP)
-            # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
-            # time.sleep(0.01)
-            setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
-            setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)    
-            print("START")
-    
-    # 모터 구동 코드
-        # setMotor(constant.L, pwmL, LEFT_SPEED, constant.BACKWARD)
-        # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)    
-        # print("RIGHT")
-
-        # pwmL=setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
-        # pwmR=setMotor(constant.R, pwmR, RIGHT_SPEED, constant.FORWARD)
-
-        # setMotor(constant.L, pwmL, 100, constant.FORWARD)
-        # setMotor(constant.R, pwmR, 50, constant.FORWARD)
-
-        # speed = (max_speed*change)
-
-        # print("LEFT : " + str(left_CAHANGE) + " RIGHT : " + str(right_CAHANGE))
-        # for cnt in contours:
-        #     cv2.drawContours(frame, cnt, -1, constant.BLACK)
+        # setMotor(constant.L, pwmL, LEFT_SPEED, constant.FORWARD)
+        # setMotor(constant.R, pwmR, RIGHT_SPEED, constant.STOP)
         # cv2.imshow("left", left_roi)
         # cv2.imshow("right", right_roi)
+        cv2.imshow("track", track_roi)
         # cv2.imwrite("image.png", frame)
-        # cv2.imshow("image", frame)
+        # cv2.imshow("image", frame_blur)
         if cv2.waitKey(1)>0:
             break
 
@@ -471,7 +412,7 @@ except KeyboardInterrupt:
 ledOnOff(constant.LOW)
 pwmL.stop()
 pwmR.stop()
-# cv2.destoryAllWindows()
+#cv2.destoryAllWindows()
 GPIO.cleanup()
 capture.release()
 
